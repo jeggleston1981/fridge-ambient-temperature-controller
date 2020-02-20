@@ -24,13 +24,24 @@ ota:
 dallas:
   - pin: 16 
     update_interval: 5s
+time:
+  - platform: sntp
+    id: sntp_time
+    on_time:
+      - cron: '* /5 * * * *'
+        then:
+          - mqtt.publish_json:
+              topic: kozi_club/ambient
+              qos: 2
+              payload: |-
+                root["temperature"] = id(fridge_temp).state;
+                root["fan"] = round(id(fan).state);
 sensor: # Ambient air temperature sensor setup
   - platform: dallas
     id: fridge_temp 
     address: 0x41030997791D7228
     name: "Fridge Ambient"
     accuracy_decimals: 1
-    force_update: true
     filters:
       - heartbeat: 30s
       - lambda: |- # Round the sensor to 1 decimal place so that that value is posted in the json mqtt message
