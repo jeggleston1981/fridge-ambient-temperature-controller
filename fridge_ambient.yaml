@@ -1,0 +1,65 @@
+esphome:
+  name: fridge_monitor
+  platform: ESP8266
+  board: esp01_1m
+
+wifi:
+  ssid: "XXXXXXXXXXXXXX"
+  password: "XXXXXXXXXXX"
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Fridge Monitor Fallback Hotspot"
+    password: "randompasword"
+
+captive_portal:
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+
+ota:
+dallas:
+  - pin: 16 
+    update_interval: 5s
+sensor: # Ambient air temperature sensor setup
+  - platform: dallas
+    id: fridge_temp 
+    address: 0x41030997791D7228
+    name: "Fridge Ambient"
+    accuracy_decimals: 1
+    force_update: true
+    filters:
+      - heartbeat: 30s
+      - lambda: |- # Round the sensor to 1 decimal place so that that value is posted in the json mqtt message
+          x = ((float )((int)(x * 10))) / 10;
+          return x;
+    on_value:
+      then:
+        - mqtt.publish_json:
+            topic: location/ambient
+            qos: 2
+            payload: |-
+              root["temperature"] = id(fridge_temp).state;
+              root["fan"] = round(id(fan).state);
+              
+switch:
+  - platform: gpio
+    name: "Fridge Exhaust"
+    pin:
+      number: 15
+    id: fan
+climate:
+  - platform: bang_bang
+    name: "Fridge Ambient Controller"
+    sensor: fridge_temp
+    default_target_temperature_low: 25 °C
+    default_target_temperature_high: 28 °C
+    cool_action:
+      - switch.turn_on: fan
+    idle_action:
+      - switch.turn_off: fan
+mqtt:
+  broker: "broker.hivemq.com"
